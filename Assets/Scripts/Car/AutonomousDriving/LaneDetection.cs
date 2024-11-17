@@ -1,4 +1,67 @@
 using System.Collections;
+using UnityEngine;
+using Barracuda; // Barracuda 사용을 위한 네임스페이스
+
+public class LaneDetection : MonoBehaviour
+{
+    public Camera vehicleCamera;
+    public NNModel yoloModel; // YOLO 모델
+    private IWorker worker; // Barracuda worker
+
+    void Start()
+    {
+        worker = ModelLoader.Load(yoloModel).CreateWorker();
+    }
+
+    public Texture2D CaptureImage()
+    {
+        RenderTexture renderTexture = new RenderTexture(1280, 720, 24);
+        vehicleCamera.targetTexture = renderTexture;
+        vehicleCamera.Render();
+
+        RenderTexture.active = renderTexture;
+        Texture2D capturedImage = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+        capturedImage.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+        capturedImage.Apply();
+
+        vehicleCamera.targetTexture = null;
+        RenderTexture.active = null;
+
+        return capturedImage;
+    }
+
+    public float GetSteeringAngle()
+    {
+        Texture2D capturedImage = CaptureImage();
+        Tensor inputTensor = new Tensor(capturedImage, 3); // 이미지 텐서 변환
+        worker.Execute(inputTensor);
+        Tensor outputTensor = worker.PeekOutput(); // YOLO 결과 추출
+
+        // YOLO의 결과를 바탕으로 차선 위치 계산 (단순화된 예시)
+        float laneCenterX = CalculateLaneCenter(outputTensor);
+
+        // 차량의 중앙과 차선 중앙의 차이를 바탕으로 조향 각도 계산
+        float steeringAngle = (laneCenterX - 640) / 640; // 예시로 단순히 계산
+
+        return steeringAngle;
+    }
+
+    private float CalculateLaneCenter(Tensor outputTensor)
+    {
+        // YOLO 결과를 바탕으로 차선의 중앙을 계산하는 로직을 추가해야 합니다.
+        return 640f; // 단순화된 예시 (중앙으로 고정)
+    }
+
+    private void OnDestroy()
+    {
+        worker.Dispose(); // worker 메모리 해제
+    }
+}
+
+
+
+
+/*using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.IO;
@@ -110,3 +173,4 @@ public class LaneDetection : MonoBehaviour
         return steeringAngle;
     }
 }
+*/
